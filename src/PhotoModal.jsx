@@ -2,25 +2,8 @@ import React, { useState, useEffect } from "react";
 import {
   getFullImageData,
   getOriginalImageData,
-  updatePhotoType,
   updatePhotoDetails,
 } from "./photoService";
-import { formatTypeName } from "./lib/utils";
-
-// Metal detecting type categories
-const METAL_DETECTING_TYPES = [
-  "coins",
-  "jewelry",
-  "relics",
-  "tools-and-hardware",
-  "tokens-and-medallions",
-  "weapons-and-ammunition",
-  "household-items",
-  "military-items",
-  "industrial-scrap-junk",
-  "religious-or-decorative-items",
-  "unknown",
-];
 
 const PhotoModal = ({
   showModal,
@@ -32,7 +15,6 @@ const PhotoModal = ({
 }) => {
   const [originalImageData, setOriginalImageData] = useState(null);
   const [isLoadingOriginal, setIsLoadingOriginal] = useState(false);
-  const [selectedType, setSelectedType] = useState("");
   const [photoName, setPhotoName] = useState("");
   const [photoDescription, setPhotoDescription] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -45,7 +27,6 @@ const PhotoModal = ({
       setOriginalImageData(null);
       setIsLoadingOriginal(true);
 
-      setSelectedType(selectedPhoto.type || "");
       setPhotoName(selectedPhoto.name || "");
       setPhotoDescription(selectedPhoto.description || "");
 
@@ -99,21 +80,6 @@ const PhotoModal = ({
 
     setIsSaving(true);
     try {
-      // Update photo type if changed
-      if (selectedType !== selectedPhoto.type) {
-        const typeResult = await updatePhotoType(
-          selectedPhoto.id,
-          selectedType,
-          user
-        );
-        if (typeResult.success) {
-          selectedPhoto.type = selectedType;
-          console.log("Photo type updated successfully");
-        } else {
-          console.error("Failed to update photo type:", typeResult.error);
-        }
-      }
-
       // Update photo name and description if changed
       if (
         photoName !== selectedPhoto.name ||
@@ -129,9 +95,13 @@ const PhotoModal = ({
           selectedPhoto.name = photoName;
           selectedPhoto.description = photoDescription;
           console.log("Photo details updated successfully");
+          setShowModal(false);
         } else {
           console.error("Failed to update photo details:", detailsResult.error);
         }
+      } else {
+        // No changes, just close the modal
+        setShowModal(false);
       }
     } catch (error) {
       console.error("Error updating photo:", error);
@@ -243,30 +213,6 @@ const PhotoModal = ({
                       Details
                     </h3>
                     <div className="space-y-1">
-                      <div className="flex justify-between items-center rounded-md">
-                        <span className="text-sm text-gray-400">Type</span>
-                        {isAdmin ? (
-                          <div className="flex items-center gap-2">
-                            <select
-                              value={selectedType}
-                              onChange={(e) => setSelectedType(e.target.value)}
-                              className="px-3 py-2 text-sm bg-gray-800 border border-gray-600 rounded text-white min-h-[44px] touch-manipulation"
-                            >
-                              <option value="">Select type...</option>
-                              {METAL_DETECTING_TYPES.map((type) => (
-                                <option key={type} value={type}>
-                                  {formatTypeName(type)}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        ) : (
-                          <span className="text-sm text-white">
-                            {formatTypeName(selectedPhoto?.type)}
-                          </span>
-                        )}
-                      </div>
-
                       {/* Photo Name */}
                       <div className="flex flex-col gap-1">
                         <span className="text-sm text-gray-400">Name</span>

@@ -51,8 +51,8 @@ const PhotoHoverPreview = ({ hoveredPhoto, mousePosition, onHoverChange }) => {
         className="w-full h-auto shadow-md"
       />
       <div className="my-2 text-center">
-        <div className="text-xs font-medium text-gray-200 capitalize">
-          {hoveredPhoto.type || "Photo"}
+        <div className="text-xs font-medium text-gray-200">
+          {hoveredPhoto.name || `Target ${hoveredPhoto.id}`}
         </div>
       </div>
     </div>

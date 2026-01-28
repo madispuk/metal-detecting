@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   FiMapPin,
   FiCalendar,
-  FiTag,
   FiHash,
   FiNavigation,
 } from "react-icons/fi";
@@ -14,7 +13,6 @@ import {
 } from "../photoService";
 import PhotoModal from "../PhotoModal";
 import ToastNotification from "../ToastNotification";
-import { formatTypeName } from "../lib/utils";
 
 // Lazy thumbnail component that loads when visible
 const LazyThumbnail = ({ photoId, onLoad }) => {
@@ -74,8 +72,6 @@ const ListView = ({ onViewChange }) => {
   const [showModal, setShowModal] = useState(false);
   const [toastOpen, setToastOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
-  const [sortBy, setSortBy] = useState("timestamp"); // timestamp, type, location
-  const [filterBy, setFilterBy] = useState("all"); // all, or specific type
   const [thumbnailCache, setThumbnailCache] = useState({});
 
   const { user, isAdmin } = useAuth();
@@ -155,27 +151,10 @@ const ListView = ({ onViewChange }) => {
     window.history.replaceState({}, "", url);
   };
 
-  // Sort and filter photos
-  const sortedAndFilteredPhotos = photos
-    .filter((photo) => {
-      if (filterBy === "all") return true;
-      return photo.type === filterBy;
-    })
-    .sort((a, b) => {
-      switch (sortBy) {
-        case "timestamp":
-          return new Date(b.timestamp) - new Date(a.timestamp);
-        case "type":
-          return a.type.localeCompare(b.type);
-        case "location":
-          return a.lat - b.lat;
-        default:
-          return 0;
-      }
-    });
-
-  // Get unique types for filter
-  const uniqueTypes = [...new Set(photos.map((photo) => photo.type))];
+  // Sort photos by date (newest first)
+  const sortedAndFilteredPhotos = [...photos].sort((a, b) => {
+    return new Date(b.timestamp) - new Date(a.timestamp);
+  });
 
   // Format date
   const formatDate = (timestamp) => {
@@ -206,42 +185,11 @@ const ListView = ({ onViewChange }) => {
 
   return (
     <div className="h-full bg-slate-50 flex flex-col">
-      {/* Header with filters */}
+      {/* Header */}
       <div className="bg-white border-b border-slate-200 p-4 flex-shrink-0">
-        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-          <div className="flex flex-col sm:flex-row gap-2">
-            <h2 className="text-lg font-semibold text-slate-800">
-              Targets ({sortedAndFilteredPhotos.length})
-            </h2>
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-2">
-            {/* Sort dropdown */}
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="px-3 py-2 text-sm text-slate-700 border border-slate-300 rounded-md bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="timestamp">Sort by Date</option>
-              <option value="type">Sort by Type</option>
-              <option value="location">Sort by Location</option>
-            </select>
-
-            {/* Filter dropdown */}
-            <select
-              value={filterBy}
-              onChange={(e) => setFilterBy(e.target.value)}
-              className="px-3 py-2 text-sm text-slate-700 border border-slate-300 rounded-md bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="all">All Types</option>
-              {uniqueTypes.map((type) => (
-                <option key={type} value={type}>
-                  {formatTypeName(type)}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
+        <h2 className="text-lg font-semibold text-slate-800">
+          Targets ({sortedAndFilteredPhotos.length})
+        </h2>
       </div>
 
       {/* Photos list */}
@@ -253,9 +201,7 @@ const ListView = ({ onViewChange }) => {
               No photos found
             </h3>
             <p className="text-xs text-slate-500">
-              {filterBy === "all"
-                ? "No photos have been uploaded yet."
-                : `No photos found for type "${filterBy}".`}
+              No photos have been uploaded yet.
             </p>
           </div>
         ) : (
@@ -310,16 +256,6 @@ const ListView = ({ onViewChange }) => {
                       />
                       <span className="text-xs text-slate-500 font-mono truncate">
                         ID: {photo.id}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-2 mb-1">
-                      <FiTag
-                        size={12}
-                        className="text-slate-400 flex-shrink-0"
-                      />
-                      <span className="text-sm font-medium text-slate-700 truncate">
-                        {formatTypeName(photo.type)}
                       </span>
                     </div>
 

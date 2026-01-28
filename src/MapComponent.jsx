@@ -65,27 +65,6 @@ const loadingDot = () => {
   });
 };
 
-// Metal detecting type categories
-const METAL_DETECTING_TYPES = [
-  "coins",
-  "jewelry",
-  "relics",
-  "tools-and-hardware",
-  "tokens-and-medallions",
-  "weapons-and-ammunition",
-  "household-items",
-  "military-items",
-  "industrial-scrap-junk",
-  "religious-or-decorative-items",
-  "unknown",
-];
-
-// Generate random type string
-const generateRandomType = () => {
-  return METAL_DETECTING_TYPES[
-    Math.floor(Math.random() * METAL_DETECTING_TYPES.length)
-  ];
-};
 
 // Component to handle map initialization
 function MapInit() {
@@ -223,8 +202,6 @@ const MapComponent = () => {
   const [loadingPhotos, setLoadingPhotos] = useState([]);
   const [mapCenter, setMapCenter] = useState(null); // Map view center (can be from URL)
   const [mapZoom, setMapZoom] = useState(15);
-  const [showTypeSelection, setShowTypeSelection] = useState(false);
-  const [pendingPhoto, setPendingPhoto] = useState(null);
   const fileInputRef = useRef(null);
 
   // Authentication
@@ -423,15 +400,49 @@ const MapComponent = () => {
             lat: coordinates.lat,
             lng: coordinates.lng,
             imageData: e.target.result,
-            image_data: e.target.result, // Also store as image_data for consistency
+            image_data: e.target.result,
             timestamp: new Date().toISOString(),
             filename: compressedFile.name || file.name,
-            type: null, // Will be set when user selects type
+            type: "target",
+            name: null, // Will be set after save with database id
           };
 
-          // Store pending photo and show type selection
-          setPendingPhoto(photoData);
-          setShowTypeSelection(true);
+          // Add loading indicator
+          const loadingPhoto = {
+            id: tempId,
+            lat: coordinates.lat,
+            lng: coordinates.lng,
+            isLoading: true,
+          };
+          setLoadingPhotos((prev) => [...prev, loadingPhoto]);
+
+          // Save directly to database
+          const result = await savePhotoToDatabase(photoData, user);
+
+          // Remove loading indicator
+          setLoadingPhotos((prev) => prev.filter((photo) => photo.id !== tempId));
+
+          if (result.success) {
+            // Set name as "Target {database_id}"
+            const savedPhoto = {
+              ...result.data,
+              imageData: result.data.image_data,
+              name: `Target ${result.data.id}`,
+            };
+
+            // Update name in database
+            const { updatePhotoDetails } = await import("./photoService");
+            await updatePhotoDetails(result.data.id, `Target ${result.data.id}`, null, user);
+
+            setCapturedPhotos((prev) => [...prev, savedPhoto]);
+            console.log("Photo saved to database successfully");
+            setToastMessage("Photo saved successfully!");
+            setToastOpen(true);
+          } else {
+            console.error("Failed to save photo to database:", result.error);
+            setToastMessage("Failed to save photo");
+            setToastOpen(true);
+          }
         };
         reader.readAsDataURL(compressedFile);
       } catch (error) {
@@ -497,53 +508,6 @@ const MapComponent = () => {
     setSelectedPhoto(null);
   };
 
-  // Handle type selection
-  const handleTypeSelection = async (selectedType) => {
-    if (!pendingPhoto) return;
-
-    const tempId = pendingPhoto.id;
-    const coordinates = {
-      lat: pendingPhoto.lat,
-      lng: pendingPhoto.lng,
-    };
-
-    // Add loading photo to show loading indicator
-    const loadingPhoto = {
-      id: tempId,
-      lat: coordinates.lat,
-      lng: coordinates.lng,
-      isLoading: true,
-    };
-    setLoadingPhotos((prev) => [...prev, loadingPhoto]);
-
-    // Update photo data with selected type
-    const photoData = {
-      ...pendingPhoto,
-      type: selectedType,
-    };
-
-    // Save to database
-    const result = await savePhotoToDatabase(photoData, user);
-
-    // Remove loading indicator
-    setLoadingPhotos((prev) => prev.filter((photo) => photo.id !== tempId));
-
-    if (result.success) {
-      // Save to local state with success
-      setCapturedPhotos((prev) => [...prev, photoData]);
-      console.log("Photo saved to database successfully");
-      setToastMessage("Photo saved successfully!");
-      setToastOpen(true);
-    } else {
-      console.error("Failed to save photo to database:", result.error);
-      setToastMessage("Failed to save photo");
-      setToastOpen(true);
-    }
-
-    // Close type selection modal
-    setShowTypeSelection(false);
-    setPendingPhoto(null);
-  };
 
   if (isLoading) {
     return (
@@ -627,19 +591,26 @@ const MapComponent = () => {
           minZoom={1}
         />
 
-        {/* Current location marker with blinking dot */}
+        {/* Current location marker with blinking dot - clicking triggers photo upload */}
         {showLocation && (
-          <Marker position={userLocation} icon={locationDot()}>
-            <Popup>
-              <div>
-                <strong>Your Location</strong>
-                <br />
-                Lat: {userLocation[0].toFixed(6)}
-                <br />
-                Lng: {userLocation[1].toFixed(6)}
-              </div>
-            </Popup>
-          </Marker>
+          <Marker
+            position={userLocation}
+            icon={locationDot()}
+            eventHandlers={{
+              click: (e) => {
+                L.DomEvent.stopPropagation(e);
+                if (!isAdmin) {
+                  setToastMessage("Admin permission required to upload photos");
+                  setToastOpen(true);
+                  return;
+                }
+                setClickCoordinates({ lat: userLocation[0], lng: userLocation[1] });
+                if (fileInputRef.current) {
+                  fileInputRef.current.click();
+                }
+              },
+            }}
+          />
         )}
 
         {/* Captured photos markers with simple event handling */}
@@ -678,65 +649,6 @@ const MapComponent = () => {
         />
         */}
       </MapContainer>
-
-      {/* Type Selection Modal */}
-      {showTypeSelection && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-          <div
-            className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm"
-            onClick={() => {
-              setShowTypeSelection(false);
-              setPendingPhoto(null);
-            }}
-          />
-          <div className="relative z-[10000] w-full max-w-2xl bg-white rounded-xl shadow-2xl border border-gray-200">
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">
-                Select Item Type
-              </h2>
-              <button
-                className="p-1.5 hover:bg-gray-100 rounded-md transition-colors"
-                onClick={() => {
-                  setShowTypeSelection(false);
-                  setPendingPhoto(null);
-                }}
-              >
-                <svg
-                  className="w-4 h-4 text-gray-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </div>
-
-            {/* Content */}
-            <div className="px-6 py-5">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {METAL_DETECTING_TYPES.map((type) => (
-                  <button
-                    key={type}
-                    onClick={() => handleTypeSelection(type)}
-                    className="p-4 text-left border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors"
-                  >
-                    <div className="font-medium text-gray-900 capitalize">
-                      {type.replace(/-/g, " ")}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Toast notifications */}
       <ToastNotification
