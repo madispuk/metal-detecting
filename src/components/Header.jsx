@@ -26,16 +26,6 @@ const Header = ({ currentView, onViewChange }) => {
         {/* Left side - Navigation tabs */}
         <nav className="flex items-center">
           <button
-            onClick={() => onViewChange("map")}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors duration-200 ${
-              currentView === "map"
-                ? "border-slate-300 text-slate-100"
-                : "border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-500"
-            }`}
-          >
-            Map
-          </button>
-          <button
             onClick={() => onViewChange("list")}
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors duration-200 ${
               currentView === "list"
@@ -44,6 +34,16 @@ const Header = ({ currentView, onViewChange }) => {
             }`}
           >
             List
+          </button>
+          <button
+            onClick={() => onViewChange("map")}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors duration-200 ${
+              currentView === "map"
+                ? "border-slate-300 text-slate-100"
+                : "border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-500"
+            }`}
+          >
+            Map
           </button>
         </nav>
 

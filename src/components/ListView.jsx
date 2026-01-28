@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   FiMapPin,
   FiCalendar,
@@ -8,12 +8,64 @@ import {
 } from "react-icons/fi";
 import { useAuth } from "../hooks/useAuth";
 import {
-  loadPhotosWithThumbnails,
+  loadPhotosMetadataOnly,
+  loadPhotoThumbnail,
   deletePhotoFromDatabase,
 } from "../photoService";
 import PhotoModal from "../PhotoModal";
 import ToastNotification from "../ToastNotification";
 import { formatTypeName } from "../lib/utils";
+
+// Lazy thumbnail component that loads when visible
+const LazyThumbnail = ({ photoId, onLoad }) => {
+  const [thumbnail, setThumbnail] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !thumbnail && !isLoading) {
+          setIsLoading(true);
+          loadPhotoThumbnail(photoId).then((result) => {
+            if (result.success) {
+              setThumbnail(result.data);
+              if (onLoad) onLoad(photoId, result.data);
+            }
+            setIsLoading(false);
+          });
+        }
+      },
+      { rootMargin: "100px" }
+    );
+
+    if (ref.current) {
+      observer.observe(ref.current);
+    }
+
+    return () => observer.disconnect();
+  }, [photoId, thumbnail, isLoading, onLoad]);
+
+  return (
+    <div ref={ref} className="w-full h-full">
+      {thumbnail ? (
+        <img
+          src={thumbnail}
+          alt="Photo thumbnail"
+          className="w-full h-full object-cover rounded"
+        />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center text-slate-400 bg-slate-100 rounded">
+          {isLoading ? (
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-slate-300"></div>
+          ) : (
+            <FiMapPin size={16} />
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const ListView = ({ onViewChange }) => {
   const [photos, setPhotos] = useState([]);
@@ -24,20 +76,26 @@ const ListView = ({ onViewChange }) => {
   const [toastMessage, setToastMessage] = useState("");
   const [sortBy, setSortBy] = useState("timestamp"); // timestamp, type, location
   const [filterBy, setFilterBy] = useState("all"); // all, or specific type
+  const [thumbnailCache, setThumbnailCache] = useState({});
 
   const { user, isAdmin } = useAuth();
 
-  // Load photos on component mount
+  // Cache loaded thumbnails
+  const handleThumbnailLoad = useCallback((photoId, thumbnailData) => {
+    setThumbnailCache((prev) => ({ ...prev, [photoId]: thumbnailData }));
+  }, []);
+
+  // Load photos metadata on component mount (fast, no image data)
   useEffect(() => {
     const loadPhotos = async () => {
       setIsLoading(true);
       try {
-        console.log("Loading photos for list view...");
-        const result = await loadPhotosWithThumbnails(100, 0);
-        console.log("Photos loading result:", result);
+        console.log("Loading photos metadata for list view...");
+        const result = await loadPhotosMetadataOnly(100, 0);
+        console.log("Photos metadata loading result:", result);
         if (result.success) {
           setPhotos(result.data);
-          console.log(`Loaded ${result.data.length} photos for list view`);
+          console.log(`Loaded ${result.data.length} photos metadata for list view`);
         } else {
           console.error("Failed to load photos:", result.error);
           setToastMessage("Failed to load photos");
@@ -211,22 +269,17 @@ const ListView = ({ onViewChange }) => {
                 <div className="flex items-center p-2">
                   {/* Photo thumbnail */}
                   <div className="w-48 h-48 bg-slate-100 rounded relative flex-shrink-0 mr-4">
-                    {photo.thumbnail_data ? (
+                    {thumbnailCache[photo.id] ? (
                       <img
-                        src={photo.thumbnail_data}
+                        src={thumbnailCache[photo.id]}
                         alt="Photo thumbnail"
                         className="w-full h-full object-cover rounded"
                       />
-                    ) : photo.imageData ? (
-                      <img
-                        src={photo.imageData}
-                        alt="Photo"
-                        className="w-full h-full object-cover rounded"
-                      />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-slate-400">
-                        <FiMapPin size={16} />
-                      </div>
+                      <LazyThumbnail
+                        photoId={photo.id}
+                        onLoad={handleThumbnailLoad}
+                      />
                     )}
                   </div>
 

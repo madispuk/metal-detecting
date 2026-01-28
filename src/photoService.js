@@ -320,6 +320,51 @@ export const loadAllPhotosFromDatabase = async () => {
   }
 };
 
+// Load photos metadata only (no image data) for fast initial load
+export const loadPhotosMetadataOnly = async (limit = 50, offset = 0) => {
+  try {
+    const { data, error } = await supabase
+      .from("photos")
+      .select(
+        "id, lat, lng, timestamp, filename, type, name, description, created_at"
+      )
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (error) {
+      console.error("Error loading photos metadata:", error);
+      return { success: false, error };
+    }
+
+    console.log(`Photos metadata loaded (${data.length} photos)`);
+    return { success: true, data };
+  } catch (error) {
+    console.error("Error loading photos metadata:", error);
+    return { success: false, error };
+  }
+};
+
+// Load thumbnail for a single photo
+export const loadPhotoThumbnail = async (photoId) => {
+  try {
+    const { data, error } = await supabase
+      .from("photos")
+      .select("thumbnail_data")
+      .eq("id", photoId)
+      .single();
+
+    if (error) {
+      console.error("Error loading photo thumbnail:", error);
+      return { success: false, error };
+    }
+
+    return { success: true, data: data.thumbnail_data };
+  } catch (error) {
+    console.error("Error loading photo thumbnail:", error);
+    return { success: false, error };
+  }
+};
+
 // Load photos with thumbnails only for better performance
 export const loadPhotosWithThumbnails = async (limit = 50, offset = 0) => {
   try {
