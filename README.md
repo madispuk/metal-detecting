@@ -1,23 +1,27 @@
-# Metal Detecting App 🗺️
+# Metal Detecting App
 
 A React-based web application for metal detecting enthusiasts to capture and store photos with precise GPS coordinates using satellite imagery.
 
 ## Features
 
-- 🛰️ **Satellite Imagery** - High-resolution Esri satellite maps
-- 📍 **GPS Location** - Automatic location detection and manual coordinate capture
-- 📸 **Photo Capture** - Take photos with precise GPS coordinates
-- 💾 **Database Storage** - Supabase integration for persistent data storage
-- 📱 **Mobile Friendly** - Optimized for mobile metal detecting adventures
-- 🗺️ **Interactive Map** - Click anywhere to capture photos at specific locations
+- **List View** - Browse all finds in a searchable, sortable list (default view)
+- **Satellite Imagery** - High-resolution Esri satellite maps
+- **GPS Location** - Automatic location detection and manual coordinate capture
+- **Photo Capture** - Take photos with precise GPS coordinates
+- **Photo Categorization** - Categorize finds by type (coins, jewelry, relics, etc.)
+- **Database Storage** - Supabase integration for persistent data storage
+- **Authentication** - Secure login with user management
+- **Mobile Friendly** - Optimized for mobile metal detecting adventures
+- **Interactive Map** - Click anywhere to capture photos at specific locations
 
 ## Tech Stack
 
 - **Frontend**: React 19 + Vite
 - **Maps**: Leaflet + React-Leaflet
 - **Database**: Supabase
+- **Storage**: Supabase Storage (for original images)
+- **Styling**: Tailwind CSS
 - **Deployment**: Vercel
-- **Styling**: CSS3
 
 ## Quick Start
 
@@ -45,11 +49,7 @@ A React-based web application for metal detecting enthusiasts to capture and sto
 3. **Set up environment variables**
 
    ```bash
-   # Copy the example environment file
    cp .env.example .env
-
-   # Edit .env with your actual Supabase credentials
-   nano .env  # or use your preferred editor
    ```
 
    Fill in your Supabase credentials in the `.env` file:
@@ -68,26 +68,36 @@ A React-based web application for metal detecting enthusiasts to capture and sto
 
 ### Database Schema
 
-The app uses a simple photos table. Run the SQL from `supabase-schema.sql` in your Supabase SQL editor:
+Create the photos table in your Supabase SQL editor:
 
 ```sql
--- Create photos table
 CREATE TABLE photos (
   id BIGSERIAL PRIMARY KEY,
   lat DECIMAL(10, 8) NOT NULL,
   lng DECIMAL(11, 8) NOT NULL,
-  image_data TEXT NOT NULL,
+  image_data TEXT,
+  thumbnail_data TEXT,
+  storage_path TEXT,
   filename TEXT,
   type TEXT,
-  timestamp TIMESTAMPTZ DEFAULT NOW()
+  name TEXT,
+  description TEXT,
+  user_id UUID REFERENCES auth.users(id),
+  timestamp TIMESTAMPTZ DEFAULT NOW(),
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Enable RLS (Row Level Security)
 ALTER TABLE photos ENABLE ROW LEVEL SECURITY;
 
--- Create policy for public access (adjust as needed)
-CREATE POLICY "Allow public access" ON photos FOR ALL USING (true);
+-- Create policy for authenticated access
+CREATE POLICY "Allow authenticated access" ON photos
+  FOR ALL USING (auth.role() = 'authenticated');
 ```
+
+### Storage Bucket
+
+Create a storage bucket named `original-images` in your Supabase dashboard for storing full-resolution photos.
 
 ### Environment Variables
 
@@ -96,20 +106,15 @@ Get your Supabase credentials from your project dashboard:
 - **Project URL**: Found in Settings > API
 - **Anon Key**: Found in Settings > API (anon/public key)
 
-> **Note**: The `.env` file is automatically ignored by git to prevent committing sensitive credentials. Always use `.env.example` as a template for new setups.
+> **Note**: The `.env` file is automatically ignored by git to prevent committing sensitive credentials.
 
 ## Deployment with Vercel
 
-### Option 1: Vercel CLI (Recommended)
+### Option 1: Vercel CLI
 
 ```bash
-# Install Vercel CLI
 npm i -g vercel
-
-# Login to Vercel
 vercel login
-
-# Deploy
 vercel
 ```
 
@@ -122,18 +127,14 @@ vercel
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`
 
-### Vercel Configuration
-
-The app includes a `vercel.json` file with optimized settings for Vite + React deployment.
-
 ## Usage
 
-1. **Allow location access** when prompted
-2. **Navigate to your metal detecting location**
-3. **Click on the map** where you want to capture a photo
-4. **Take a photo** using your device's camera
-5. **View captured photos** by hovering over blue markers
-6. **Click markers** to see full photo details and delete if needed
+1. **Log in** with your credentials
+2. **Browse finds** in the List view (default landing page)
+3. **Switch to Map view** to see locations on satellite imagery
+4. **Click on the map** to capture a new photo at that location
+5. **Categorize finds** by type when uploading
+6. **Jump to map** from any list item to see its exact location
 
 ## Development
 
@@ -148,28 +149,27 @@ The app includes a `vercel.json` file with optimized settings for Vite + React d
 
 ```
 src/
-├── MapComponent.jsx    # Main map component
-├── photoService.js     # Supabase photo operations
-├── supabase.js         # Supabase client configuration
-└── App.jsx            # Root component
+├── components/
+│   ├── AuthGuard.jsx       # Authentication wrapper
+│   ├── Header.jsx          # Navigation header
+│   ├── ListView.jsx        # List view component
+│   ├── LoadingSpinner.jsx  # Loading indicator
+│   └── LoginForm.jsx       # Login form
+├── contexts/
+│   ├── AuthContext.jsx     # Authentication context
+│   └── PhotosContext.jsx   # Photos state context
+├── hooks/
+│   └── useAuth.js          # Authentication hook
+├── lib/
+│   └── utils.js            # Utility functions
+├── App.jsx                 # Root component
+├── MapComponent.jsx        # Map view component
+├── PhotoModal.jsx          # Photo detail modal
+├── photoService.js         # Supabase photo operations
+├── supabase.js             # Supabase client configuration
+└── ToastNotification.jsx   # Toast notifications
 ```
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
 
 ## License
 
 This project is open source and available under the [MIT License](LICENSE).
-
-## Support
-
-For issues and questions:
-
-- Check the [Issues](https://github.com/your-username/metal-detecting/issues) page
-- Review the [Supabase documentation](https://supabase.com/docs)
-- Check [Vercel documentation](https://vercel.com/docs) for deployment help
